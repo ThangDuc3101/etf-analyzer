@@ -7,6 +7,8 @@
  * ever deal with the happy path.
  */
 
+import { unstable_cache } from "next/cache";
+
 const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
 
 export class AlphaVantageError extends Error {
@@ -33,7 +35,12 @@ async function request<T>(params: Record<string, string>): Promise<T> {
     url.searchParams.set(key, value);
   }
 
-  const response = await fetch(url, { next: { revalidate: 3600 } });
+  // `cache: "no-store"` here on purpose: Alpha Vantage always responds 200 OK
+  // even for soft errors (rate limiting, bad symbol), so Next's fetch cache
+  // can't tell a real result from an error and would otherwise cache the
+  // error for the full revalidate window. Callers cache the parsed,
+  // validated result instead — see `cachedRequest` below.
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new AlphaVantageError(
       `Alpha Vantage request failed with status ${response.status}`,
@@ -55,6 +62,23 @@ async function request<T>(params: Record<string, string>): Promise<T> {
   }
 
   return body as T;
+}
+
+/**
+ * Caches a successful result for an hour, keyed by function name + symbol.
+ * Because `unstable_cache` only stores what the wrapped thunk *returns*, a
+ * thrown `AlphaVantageError` (soft error, or "no data for this symbol") is
+ * never cached — the next call retries against the live API instead of
+ * replaying the error.
+ */
+function cached<T>(
+  functionName: string,
+  symbol: string,
+  fetchData: () => Promise<T>,
+): Promise<T> {
+  return unstable_cache(fetchData, [functionName, symbol], {
+    revalidate: 3600,
+  })();
 }
 
 export interface EtfSectorWeight {
@@ -81,7 +105,9 @@ export interface EtfProfile {
 
 /** `function=ETF_PROFILE` — composition, expense ratio, and top holdings for an ETF symbol. */
 export async function getEtfProfile(symbol: string): Promise<EtfProfile> {
-  return request<EtfProfile>({ function: "ETF_PROFILE", symbol });
+  return cached("ETF_PROFILE", symbol, () =>
+    request<EtfProfile>({ function: "ETF_PROFILE", symbol }),
+  );
 }
 
 export interface GlobalQuote {
@@ -104,19 +130,21 @@ interface RawGlobalQuoteResponse {
 
 /** `function=GLOBAL_QUOTE` — latest price snapshot for a symbol. */
 export async function getGlobalQuote(symbol: string): Promise<GlobalQuote> {
-  const raw = await request<RawGlobalQuoteResponse>({
-    function: "GLOBAL_QUOTE",
-    symbol,
+  return cached("GLOBAL_QUOTE", symbol, async () => {
+    const raw = await request<RawGlobalQuoteResponse>({
+      function: "GLOBAL_QUOTE",
+      symbol,
+    });
+    const quote = raw["Global Quote"];
+    if (!quote || !quote["01. symbol"]) {
+      throw new AlphaVantageError(`No quote found for symbol "${symbol}"`);
+    }
+    return {
+      symbol: quote["01. symbol"],
+      price: quote["05. price"],
+      change: quote["09. change"],
+      changePercent: quote["10. change percent"],
+      latestTradingDay: quote["07. latest trading day"],
+    };
   });
-  const quote = raw["Global Quote"];
-  if (!quote || !quote["01. symbol"]) {
-    throw new AlphaVantageError(`No quote found for symbol "${symbol}"`);
-  }
-  return {
-    symbol: quote["01. symbol"],
-    price: quote["05. price"],
-    change: quote["09. change"],
-    changePercent: quote["10. change percent"],
-    latestTradingDay: quote["07. latest trading day"],
-  };
 }
