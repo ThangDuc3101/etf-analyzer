@@ -3,12 +3,26 @@
 import { useState } from "react";
 import type { EtfProfile, GlobalQuote } from "@/lib/alpha-vantage";
 import type { VnPricePoint, VnQuote } from "@/lib/vietcap";
+import type { TechnicalAnalysis } from "@/lib/technical-analysis";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 
 interface EtfLookupResult {
   profile: EtfProfile | null;
   quote: (GlobalQuote | VnQuote) & { currency: "USD" | "VND" };
   priceHistory: VnPricePoint[] | null;
+  technicalAnalysis: TechnicalAnalysis | null;
+}
+
+const RSI_ZONE_LABEL: Record<TechnicalAnalysis["rsi14"]["zone"], string> = {
+  overbought: "Overbought (>70)",
+  oversold: "Oversold (<30)",
+  neutral: "Neutral",
+  unknown: "Not enough history",
+};
+
+function formatPercent(value: number | null): string {
+  if (value === null) return "—";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
 export default function Home() {
@@ -88,8 +102,49 @@ export default function Home() {
               </h3>
               <PriceHistoryChart
                 points={result.priceHistory}
+                sma20={result.technicalAnalysis?.sma20}
+                sma50={result.technicalAnalysis?.sma50}
                 currency={result.quote.currency}
               />
+            </div>
+          )}
+
+          {result.technicalAnalysis && (
+            <div>
+              <h3 className="text-sm font-medium">Performance &amp; risk</h3>
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                <dt className="text-gray-500">7-day change</dt>
+                <dd>{formatPercent(result.technicalAnalysis.performance.changePercent7d)}</dd>
+                <dt className="text-gray-500">30-day change</dt>
+                <dd>{formatPercent(result.technicalAnalysis.performance.changePercent30d)}</dd>
+                <dt className="text-gray-500">90-day change</dt>
+                <dd>{formatPercent(result.technicalAnalysis.performance.changePercent90d)}</dd>
+                <dt className="text-gray-500">90-day high / low</dt>
+                <dd>
+                  {result.technicalAnalysis.performance.periodHigh.toLocaleString("en-US")} /{" "}
+                  {result.technicalAnalysis.performance.periodLow.toLocaleString("en-US")}
+                </dd>
+                <dt className="text-gray-500">Volatility (annualized)</dt>
+                <dd>
+                  {result.technicalAnalysis.performance.volatilityPercent === null
+                    ? "—"
+                    : `${result.technicalAnalysis.performance.volatilityPercent.toFixed(1)}%`}
+                </dd>
+                <dt className="text-gray-500">Max drawdown</dt>
+                <dd>{result.technicalAnalysis.performance.maxDrawdownPercent.toFixed(2)}%</dd>
+                <dt className="text-gray-500">RSI(14)</dt>
+                <dd>
+                  {result.technicalAnalysis.rsi14.value === null
+                    ? "—"
+                    : result.technicalAnalysis.rsi14.value.toFixed(1)}{" "}
+                  <span className="text-gray-500">
+                    ({RSI_ZONE_LABEL[result.technicalAnalysis.rsi14.zone]})
+                  </span>
+                </dd>
+              </dl>
+              <p className="mt-2 text-xs text-gray-400">
+                Objective technical indicators computed from price history — not investment advice.
+              </p>
             </div>
           )}
 

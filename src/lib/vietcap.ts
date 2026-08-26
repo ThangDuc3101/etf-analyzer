@@ -19,10 +19,11 @@ import { cached } from "./cache";
 const VIETCAP_CHART_URL =
   "https://trading.vietcap.com.vn/api/chart/OHLCChart/gap-chart";
 
-// One daily-bars window shared by the quote and the price-history chart, so
-// looking up both for the same symbol costs a single Vietcap request (the
-// second call is a cache hit) instead of two.
-const DAILY_BARS_WINDOW = 90;
+// One daily-bars window shared by the quote, the price-history chart, and
+// the 90-day performance stat, so looking up all three for the same symbol
+// costs a single Vietcap request (the rest are cache hits) instead of three.
+// 91, not 90: a "90-day change" needs a price from 90 days ago *and* today.
+const DAILY_BARS_WINDOW = 91;
 
 export class VietcapError extends Error {
   constructor(message: string) {

@@ -15,6 +15,12 @@ import {
   type VnPricePoint,
   type VnQuote,
 } from "@/lib/vietcap";
+import {
+  computePerformanceStats,
+  computeRSI,
+  computeSMA,
+  type TechnicalAnalysis,
+} from "@/lib/technical-analysis";
 
 export async function GET(
   _request: Request,
@@ -44,6 +50,7 @@ export async function GET(
 
   let quote: (GlobalQuote | VnQuote) & { currency: "USD" | "VND" };
   let priceHistory: VnPricePoint[] | null = null;
+  let technicalAnalysis: TechnicalAnalysis | null = null;
   try {
     quote = { ...(await getGlobalQuote(upperSymbol)), currency: "USD" };
   } catch (error) {
@@ -60,6 +67,13 @@ export async function GET(
     try {
       quote = { ...(await getVnQuote(vnSymbol)), currency: "VND" };
       priceHistory = await getVnPriceHistory(vnSymbol);
+      const closes = priceHistory.map((point) => point.close);
+      technicalAnalysis = {
+        performance: computePerformanceStats(closes),
+        rsi14: computeRSI(closes, 14),
+        sma20: computeSMA(closes, 20),
+        sma50: computeSMA(closes, 50),
+      };
     } catch (vnError) {
       if (!(vnError instanceof VietcapError)) throw vnError;
       // Neither source has this symbol. Lead with Alpha Vantage's message —
@@ -72,5 +86,5 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ profile, quote, priceHistory });
+  return NextResponse.json({ profile, quote, priceHistory, technicalAnalysis });
 }
