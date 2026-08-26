@@ -7,7 +7,7 @@
  * ever deal with the happy path.
  */
 
-import { unstable_cache } from "next/cache";
+import { cached } from "./cache";
 
 const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
 
@@ -18,10 +18,18 @@ export class AlphaVantageError extends Error {
   }
 }
 
+/**
+ * A missing/misconfigured API key, as opposed to a symbol Alpha Vantage
+ * simply has no data for. Callers that fall back to another data source on
+ * `AlphaVantageError` should let this one through instead — falling back
+ * here would mask a setup mistake as "symbol not found".
+ */
+export class AlphaVantageConfigError extends AlphaVantageError {}
+
 function getApiKey(): string {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   if (!apiKey) {
-    throw new AlphaVantageError(
+    throw new AlphaVantageConfigError(
       "ALPHA_VANTAGE_API_KEY is not set. Copy .env.example to .env.local and add your key.",
     );
   }
@@ -64,23 +72,6 @@ async function request<T>(params: Record<string, string>): Promise<T> {
   return body as T;
 }
 
-/**
- * Caches a successful result for an hour, keyed by function name + symbol.
- * Because `unstable_cache` only stores what the wrapped thunk *returns*, a
- * thrown `AlphaVantageError` (soft error, or "no data for this symbol") is
- * never cached — the next call retries against the live API instead of
- * replaying the error.
- */
-function cached<T>(
-  functionName: string,
-  symbol: string,
-  fetchData: () => Promise<T>,
-): Promise<T> {
-  return unstable_cache(fetchData, [functionName, symbol], {
-    revalidate: 3600,
-  })();
-}
-
 export interface EtfSectorWeight {
   sector: string;
   weight: string;
@@ -105,9 +96,18 @@ export interface EtfProfile {
 
 /** `function=ETF_PROFILE` — composition, expense ratio, and top holdings for an ETF symbol. */
 export async function getEtfProfile(symbol: string): Promise<EtfProfile> {
-  return cached("ETF_PROFILE", symbol, () =>
-    request<EtfProfile>({ function: "ETF_PROFILE", symbol }),
-  );
+  return cached(["alpha-vantage", "ETF_PROFILE", symbol], async () => {
+    const profile = await request<EtfProfile>({
+      function: "ETF_PROFILE",
+      symbol,
+    });
+    // Unlike GLOBAL_QUOTE, Alpha Vantage doesn't wrap "no data" in an
+    // "Error Message" here — it just responds with `{}`.
+    if (!profile.net_assets) {
+      throw new AlphaVantageError(`No ETF profile found for symbol "${symbol}"`);
+    }
+    return profile;
+  });
 }
 
 export interface GlobalQuote {
@@ -130,7 +130,7 @@ interface RawGlobalQuoteResponse {
 
 /** `function=GLOBAL_QUOTE` — latest price snapshot for a symbol. */
 export async function getGlobalQuote(symbol: string): Promise<GlobalQuote> {
-  return cached("GLOBAL_QUOTE", symbol, async () => {
+  return cached(["alpha-vantage", "GLOBAL_QUOTE", symbol], async () => {
     const raw = await request<RawGlobalQuoteResponse>({
       function: "GLOBAL_QUOTE",
       symbol,

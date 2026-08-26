@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import type { EtfProfile, GlobalQuote } from "@/lib/alpha-vantage";
+import type { VnQuote } from "@/lib/vietcap";
 
 interface EtfLookupResult {
-  profile: EtfProfile;
-  quote: GlobalQuote;
+  profile: EtfProfile | null;
+  quote: (GlobalQuote | VnQuote) & { currency: "USD" | "VND" };
 }
 
 export default function Home() {
@@ -51,7 +52,7 @@ export default function Home() {
         <input
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
-          placeholder="e.g. QQQ"
+          placeholder="e.g. QQQ or E1VFVN30"
           className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-transparent"
         />
         <button
@@ -70,33 +71,44 @@ export default function Home() {
           <div>
             <h2 className="text-lg font-medium">{result.quote.symbol}</h2>
             <p className="text-sm text-gray-500">
-              ${result.quote.price} ({result.quote.changePercent}) as of{" "}
+              {result.quote.currency === "VND"
+                ? `${result.quote.price}₫`
+                : `$${result.quote.price}`}{" "}
+              ({result.quote.changePercent}) as of{" "}
               {result.quote.latestTradingDay}
             </p>
           </div>
 
-          <dl className="grid grid-cols-2 gap-2 text-sm">
-            <dt className="text-gray-500">Net assets</dt>
-            <dd>{result.profile.net_assets}</dd>
-            <dt className="text-gray-500">Expense ratio</dt>
-            <dd>{result.profile.net_expense_ratio}</dd>
-            <dt className="text-gray-500">Dividend yield</dt>
-            <dd>{result.profile.dividend_yield}</dd>
-            <dt className="text-gray-500">Inception date</dt>
-            <dd>{result.profile.inception_date}</dd>
-          </dl>
+          {result.profile ? (
+            <>
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                <dt className="text-gray-500">Net assets</dt>
+                <dd>{result.profile.net_assets}</dd>
+                <dt className="text-gray-500">Expense ratio</dt>
+                <dd>{result.profile.net_expense_ratio}</dd>
+                <dt className="text-gray-500">Dividend yield</dt>
+                <dd>{result.profile.dividend_yield}</dd>
+                <dt className="text-gray-500">Inception date</dt>
+                <dd>{result.profile.inception_date}</dd>
+              </dl>
 
-          {result.profile.sectors?.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium">Top sectors</h3>
-              <ul className="text-sm text-gray-500">
-                {result.profile.sectors.slice(0, 5).map((sector) => (
-                  <li key={sector.sector}>
-                    {sector.sector} — {sector.weight}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {result.profile.sectors?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium">Top sectors</h3>
+                  <ul className="text-sm text-gray-500">
+                    {result.profile.sectors.slice(0, 5).map((sector) => (
+                      <li key={sector.sector}>
+                        {sector.sector} — {sector.weight}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">
+              No composition data available for this symbol.
+            </p>
           )}
         </div>
       )}
