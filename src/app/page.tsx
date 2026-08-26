@@ -14,10 +14,10 @@ interface EtfLookupResult {
 }
 
 const RSI_ZONE_LABEL: Record<TechnicalAnalysis["rsi14"]["zone"], string> = {
-  overbought: "Overbought (>70)",
-  oversold: "Oversold (<30)",
-  neutral: "Neutral",
-  unknown: "Not enough history",
+  overbought: "Quá mua (>70)",
+  oversold: "Quá bán (<30)",
+  neutral: "Trung tính",
+  unknown: "Chưa đủ dữ liệu",
 };
 
 function formatPercent(value: number | null): string {
@@ -45,11 +45,11 @@ export default function Home() {
       );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error ?? "Lookup failed");
+        throw new Error(data.error ?? "Tra cứu thất bại");
       }
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lookup failed");
+      setError(err instanceof Error ? err.message : "Tra cứu thất bại");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export default function Home() {
       <div>
         <h1 className="text-2xl font-semibold">ETF Analyzer</h1>
         <p className="text-sm text-gray-500">
-          Look up an ETF symbol to see its price and composition.
+          Tra cứu mã ETF để xem giá và cơ cấu danh mục.
         </p>
       </div>
 
@@ -68,7 +68,7 @@ export default function Home() {
         <input
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
-          placeholder="e.g. QQQ or E1VFVN30"
+          placeholder="vd. QQQ hoặc E1VFVN30"
           className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-transparent"
         />
         <button
@@ -76,7 +76,7 @@ export default function Home() {
           disabled={loading}
           className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
-          {loading ? "Loading…" : "Search"}
+          {loading ? "Đang tải…" : "Tìm kiếm"}
         </button>
       </form>
 
@@ -90,7 +90,7 @@ export default function Home() {
               {result.quote.currency === "VND"
                 ? `${result.quote.price}₫`
                 : `$${result.quote.price}`}{" "}
-              ({result.quote.changePercent}) as of{" "}
+              ({result.quote.changePercent}) tại phiên{" "}
               {result.quote.latestTradingDay}
             </p>
           </div>
@@ -98,7 +98,7 @@ export default function Home() {
           {result.priceHistory && result.priceHistory.length > 1 && (
             <div>
               <h3 className="text-sm font-medium">
-                {result.priceHistory.length}-day price history
+                Lịch sử giá {result.priceHistory.length} ngày
               </h3>
               <PriceHistoryChart
                 points={result.priceHistory}
@@ -111,26 +111,26 @@ export default function Home() {
 
           {result.technicalAnalysis && (
             <div>
-              <h3 className="text-sm font-medium">Performance &amp; risk</h3>
+              <h3 className="text-sm font-medium">Hiệu suất &amp; rủi ro</h3>
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-gray-500">7-day change</dt>
+                <dt className="text-gray-500">Thay đổi 7 ngày</dt>
                 <dd>{formatPercent(result.technicalAnalysis.performance.changePercent7d)}</dd>
-                <dt className="text-gray-500">30-day change</dt>
+                <dt className="text-gray-500">Thay đổi 30 ngày</dt>
                 <dd>{formatPercent(result.technicalAnalysis.performance.changePercent30d)}</dd>
-                <dt className="text-gray-500">90-day change</dt>
+                <dt className="text-gray-500">Thay đổi 90 ngày</dt>
                 <dd>{formatPercent(result.technicalAnalysis.performance.changePercent90d)}</dd>
-                <dt className="text-gray-500">90-day high / low</dt>
+                <dt className="text-gray-500">Cao/thấp nhất 90 ngày</dt>
                 <dd>
                   {result.technicalAnalysis.performance.periodHigh.toLocaleString("en-US")} /{" "}
                   {result.technicalAnalysis.performance.periodLow.toLocaleString("en-US")}
                 </dd>
-                <dt className="text-gray-500">Volatility (annualized)</dt>
+                <dt className="text-gray-500">Độ biến động (năm hóa)</dt>
                 <dd>
                   {result.technicalAnalysis.performance.volatilityPercent === null
                     ? "—"
                     : `${result.technicalAnalysis.performance.volatilityPercent.toFixed(1)}%`}
                 </dd>
-                <dt className="text-gray-500">Max drawdown</dt>
+                <dt className="text-gray-500">Sụt giảm tối đa</dt>
                 <dd>{result.technicalAnalysis.performance.maxDrawdownPercent.toFixed(2)}%</dd>
                 <dt className="text-gray-500">RSI(14)</dt>
                 <dd>
@@ -143,7 +143,7 @@ export default function Home() {
                 </dd>
               </dl>
               <p className="mt-2 text-xs text-gray-400">
-                Objective technical indicators computed from price history — not investment advice.
+                Chỉ số kỹ thuật khách quan tính từ lịch sử giá — không phải khuyến nghị đầu tư.
               </p>
             </div>
           )}
@@ -151,19 +151,19 @@ export default function Home() {
           {result.profile ? (
             <>
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-gray-500">Net assets</dt>
+                <dt className="text-gray-500">Tổng tài sản</dt>
                 <dd>{result.profile.net_assets}</dd>
-                <dt className="text-gray-500">Expense ratio</dt>
+                <dt className="text-gray-500">Tỷ lệ chi phí</dt>
                 <dd>{result.profile.net_expense_ratio}</dd>
-                <dt className="text-gray-500">Dividend yield</dt>
+                <dt className="text-gray-500">Tỷ suất cổ tức</dt>
                 <dd>{result.profile.dividend_yield}</dd>
-                <dt className="text-gray-500">Inception date</dt>
+                <dt className="text-gray-500">Ngày thành lập</dt>
                 <dd>{result.profile.inception_date}</dd>
               </dl>
 
               {result.profile.sectors?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium">Top sectors</h3>
+                  <h3 className="text-sm font-medium">Nhóm ngành hàng đầu</h3>
                   <ul className="text-sm text-gray-500">
                     {result.profile.sectors.slice(0, 5).map((sector) => (
                       <li key={sector.sector}>
@@ -176,7 +176,7 @@ export default function Home() {
             </>
           ) : (
             <p className="text-sm text-gray-500">
-              No composition data available for this symbol.
+              Không có dữ liệu cơ cấu danh mục cho mã này.
             </p>
           )}
         </div>

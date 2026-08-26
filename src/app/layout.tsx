@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ETF Analyzer",
-  description: "Look up and analyze ETF data via Alpha Vantage.",
+  description: "Tra cứu và phân tích dữ liệu ETF qua Alpha Vantage và Vietcap.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>

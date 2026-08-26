@@ -151,7 +151,7 @@ export function PriceHistoryChart({
         <div className="mb-1 flex gap-4 text-xs text-[var(--text-secondary)]">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4" style={{ backgroundColor: "var(--series-1)" }} />
-            Price
+            Giá
           </span>
           {sma20 && (
             <span className="flex items-center gap-1.5">
@@ -174,7 +174,7 @@ export function PriceHistoryChart({
         onPointerMove={handlePointerMove}
         onPointerLeave={() => setHoverIndex(null)}
         role="img"
-        aria-label={`Price history from ${points[0].date} to ${last.date}, ranging from ${formatPrice(minClose)} to ${formatPrice(maxClose)}`}
+        aria-label={`Lịch sử giá từ ${points[0].date} đến ${last.date}, dao động từ ${formatPrice(minClose)} đến ${formatPrice(maxClose)}`}
       >
         {/* Reference gridlines, hairline, recessive */}
         <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={PADDING.top} y2={PADDING.top} stroke="var(--grid)" strokeWidth={1} />
