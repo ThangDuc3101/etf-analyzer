@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import type { EtfProfile, GlobalQuote } from "@/lib/alpha-vantage";
-import type { VnQuote } from "@/lib/vietcap";
+import type { VnPricePoint, VnQuote } from "@/lib/vietcap";
+import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 
 interface EtfLookupResult {
   profile: EtfProfile | null;
   quote: (GlobalQuote | VnQuote) & { currency: "USD" | "VND" };
+  priceHistory: VnPricePoint[] | null;
 }
 
 export default function Home() {
@@ -78,6 +80,18 @@ export default function Home() {
               {result.quote.latestTradingDay}
             </p>
           </div>
+
+          {result.priceHistory && result.priceHistory.length > 1 && (
+            <div>
+              <h3 className="text-sm font-medium">
+                {result.priceHistory.length}-day price history
+              </h3>
+              <PriceHistoryChart
+                points={result.priceHistory}
+                currency={result.quote.currency}
+              />
+            </div>
+          )}
 
           {result.profile ? (
             <>

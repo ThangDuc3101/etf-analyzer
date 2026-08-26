@@ -7,7 +7,14 @@ import {
   type EtfProfile,
   type GlobalQuote,
 } from "@/lib/alpha-vantage";
-import { getVnQuote, stripVnSuffix, VietcapError, type VnQuote } from "@/lib/vietcap";
+import {
+  getVnPriceHistory,
+  getVnQuote,
+  stripVnSuffix,
+  VietcapError,
+  type VnPricePoint,
+  type VnQuote,
+} from "@/lib/vietcap";
 
 export async function GET(
   _request: Request,
@@ -36,6 +43,7 @@ export async function GET(
   await new Promise((resolve) => setTimeout(resolve, 1100));
 
   let quote: (GlobalQuote | VnQuote) & { currency: "USD" | "VND" };
+  let priceHistory: VnPricePoint[] | null = null;
   try {
     quote = { ...(await getGlobalQuote(upperSymbol)), currency: "USD" };
   } catch (error) {
@@ -45,14 +53,24 @@ export async function GET(
     if (!(error instanceof AlphaVantageError)) throw error;
 
     // Not found on Alpha Vantage — fall back to Vietcap's public API for
-    // Vietnam-listed symbols (e.g. the ETF "E1VFVN30" on HOSE).
+    // Vietnam-listed symbols (e.g. the ETF "E1VFVN30" on HOSE). Vietcap has
+    // no composition data, but it does give us daily price history, which
+    // Alpha Vantage's GLOBAL_QUOTE doesn't — so VN lookups get a chart.
+    const vnSymbol = stripVnSuffix(upperSymbol);
     try {
-      quote = { ...(await getVnQuote(stripVnSuffix(upperSymbol))), currency: "VND" };
+      quote = { ...(await getVnQuote(vnSymbol)), currency: "VND" };
+      priceHistory = await getVnPriceHistory(vnSymbol);
     } catch (vnError) {
       if (!(vnError instanceof VietcapError)) throw vnError;
-      return NextResponse.json({ error: vnError.message }, { status: 502 });
+      // Neither source has this symbol. Lead with Alpha Vantage's message —
+      // if that failure was a rate limit rather than "not found", losing it
+      // behind Vietcap's generic "no quote" would hide the real cause.
+      return NextResponse.json(
+        { error: `${error.message} (Vietcap: ${vnError.message})` },
+        { status: 502 },
+      );
     }
   }
 
-  return NextResponse.json({ profile, quote });
+  return NextResponse.json({ profile, quote, priceHistory });
 }

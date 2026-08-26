@@ -19,6 +19,11 @@ import { cached } from "./cache";
 const VIETCAP_CHART_URL =
   "https://trading.vietcap.com.vn/api/chart/OHLCChart/gap-chart";
 
+// One daily-bars window shared by the quote and the price-history chart, so
+// looking up both for the same symbol costs a single Vietcap request (the
+// second call is a cache hit) instead of two.
+const DAILY_BARS_WINDOW = 90;
+
 export class VietcapError extends Error {
   constructor(message: string) {
     super(message);
@@ -39,13 +44,27 @@ export interface VnQuote {
   latestTradingDay: string;
 }
 
+export interface VnPricePoint {
+  date: string; // ISO yyyy-mm-dd
+  close: number;
+}
+
 interface OhlcChartBars {
   symbol: string;
   c: number[];
   t: string[];
 }
 
-async function fetchDailyBars(symbol: string): Promise<OhlcChartBars | undefined> {
+interface DailyBars {
+  symbol: string;
+  dates: string[]; // ISO yyyy-mm-dd, oldest first
+  closes: number[];
+}
+
+async function fetchDailyBars(
+  symbol: string,
+  countBack: number,
+): Promise<OhlcChartBars | undefined> {
   const response = await fetch(VIETCAP_CHART_URL, {
     method: "POST",
     cache: "no-store",
@@ -59,7 +78,7 @@ async function fetchDailyBars(symbol: string): Promise<OhlcChartBars | undefined
       timeFrame: "ONE_DAY",
       symbols: [symbol],
       to: Math.floor(Date.now() / 1000),
-      countBack: 2, // today + previous close, for a change calculation
+      countBack,
     }),
   });
 
@@ -73,27 +92,40 @@ async function fetchDailyBars(symbol: string): Promise<OhlcChartBars | undefined
   return body[0];
 }
 
-/** Latest daily close + change for a HOSE/HNX/UPCOM-listed symbol (stock or ETF). */
-export async function getVnQuote(symbol: string): Promise<VnQuote> {
-  return cached(["vietcap", "quote", symbol], async () => {
-    const bars = await fetchDailyBars(symbol);
+function getDailyBars(symbol: string): Promise<DailyBars> {
+  return cached(["vietcap", "daily-bars", symbol], async () => {
+    const bars = await fetchDailyBars(symbol, DAILY_BARS_WINDOW);
     if (!bars || bars.c.length === 0) {
       throw new VietcapError(`No quote found for symbol "${symbol}"`);
     }
-
-    const closes = bars.c;
-    const latest = closes[closes.length - 1];
-    const previous = closes.length > 1 ? closes[closes.length - 2] : latest;
-    const change = latest - previous;
-    const changePercent = previous !== 0 ? (change / previous) * 100 : 0;
-    const latestTimestampMs = Number(bars.t[bars.t.length - 1]) * 1000;
-
     return {
       symbol: bars.symbol,
-      price: latest.toString(),
-      change: change.toFixed(2),
-      changePercent: `${changePercent.toFixed(2)}%`,
-      latestTradingDay: new Date(latestTimestampMs).toISOString().slice(0, 10),
+      dates: bars.t.map((ts) => new Date(Number(ts) * 1000).toISOString().slice(0, 10)),
+      closes: bars.c,
     };
   });
+}
+
+/** Latest daily close + change for a HOSE/HNX/UPCOM-listed symbol (stock or ETF). */
+export async function getVnQuote(symbol: string): Promise<VnQuote> {
+  const bars = await getDailyBars(symbol);
+  const closes = bars.closes;
+  const latest = closes[closes.length - 1];
+  const previous = closes.length > 1 ? closes[closes.length - 2] : latest;
+  const change = latest - previous;
+  const changePercent = previous !== 0 ? (change / previous) * 100 : 0;
+
+  return {
+    symbol: bars.symbol,
+    price: latest.toString(),
+    change: change.toFixed(2),
+    changePercent: `${changePercent.toFixed(2)}%`,
+    latestTradingDay: bars.dates[bars.dates.length - 1],
+  };
+}
+
+/** Daily close prices for the last ~90 trading days, oldest first — for a price-history chart. */
+export async function getVnPriceHistory(symbol: string): Promise<VnPricePoint[]> {
+  const bars = await getDailyBars(symbol);
+  return bars.dates.map((date, i) => ({ date, close: bars.closes[i] }));
 }
