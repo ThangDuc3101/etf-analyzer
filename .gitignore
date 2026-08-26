@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code runtime state (not project config)
+.claude/scheduled_tasks.lock

@@ -8,6 +8,10 @@ Issues live as GitHub issues, managed via the `gh` CLI. See `docs/agents/issue-t
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Frontend design taste
+
+`.claude/skills/` vendors the [taste-skill](https://github.com/Leonxlnx/taste-skill) skill set (MIT-licensed) for UI/redesign work: `taste-skill` (general anti-slop frontend + Section 11's redesign protocol), plus `brutalist-skill`, `gpt-tasteskill`, `image-to-code-skill`, `brandkit`. Most of it targets landing pages/portfolios, which this app is not — pull only what applies (typography, color, spacing, interactive-state completeness; skip hero/CTA/bento-grid rules). See `.claude/skills/llms.txt` for the full index.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
