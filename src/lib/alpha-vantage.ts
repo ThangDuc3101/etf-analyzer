@@ -36,6 +36,17 @@ function getApiKey(): string {
   return apiKey;
 }
 
+/**
+ * Alpha Vantage's rate-limit message echoes the caller's own API key back
+ * in plain text (e.g. "We have detected your API key as XXXX..."), and that
+ * message flows straight into API responses shown to whoever is using this
+ * app. Strip it before it leaves this module.
+ */
+function redactApiKey(message: string): string {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+  return apiKey ? message.split(apiKey).join("[REDACTED]") : message;
+}
+
 async function request<T>(params: Record<string, string>): Promise<T> {
   const url = new URL(ALPHA_VANTAGE_BASE_URL);
   url.searchParams.set("apikey", getApiKey());
@@ -58,15 +69,15 @@ async function request<T>(params: Record<string, string>): Promise<T> {
   const body = (await response.json()) as Record<string, unknown>;
 
   if (typeof body["Error Message"] === "string") {
-    throw new AlphaVantageError(body["Error Message"]);
+    throw new AlphaVantageError(redactApiKey(body["Error Message"]));
   }
   // Rate limiting and other soft errors come back as 200s with a "Note" or
   // "Information" field instead of the requested data.
   if (typeof body["Note"] === "string") {
-    throw new AlphaVantageError(body["Note"]);
+    throw new AlphaVantageError(redactApiKey(body["Note"]));
   }
   if (typeof body["Information"] === "string") {
-    throw new AlphaVantageError(body["Information"]);
+    throw new AlphaVantageError(redactApiKey(body["Information"]));
   }
 
   return body as T;
